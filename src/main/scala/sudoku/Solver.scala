@@ -35,17 +35,44 @@ object Solver {
 
     def hasValue(pos: Coord): Boolean = hasValue(squares(pos.x)(pos.y))
 
-    def hasValue(sq: Square):Boolean = sq.size == 1
+    private def hasValue(sq: Square):Boolean = sq.size == 1
 
     def isComplete: Boolean = squares.forall(_.forall(_.size == 1))
 
-    override def toString: String = {
-      squares.map(_.map(x => if(hasValue(x)) x.head.toString else ".").mkString).mkString("\n")
+    private def mapRow(op: Square => Square, row: Int, board: Vector[Vector[Square]]) = {
+      board(row).map(op)
     }
-  }
 
-  def isSafe(value: Int, position: Int, board: Board) = {
+    private def mapCol(op: Square => Square, col: Int, board: Vector[Vector[Square]]) = {
+      board.map(row => {
+        val oldVal = row(col)
+        row.updated(col, op(oldVal))
+      })
+    }
 
+    private def mapArea(pos1: Coord, pos2: Coord) (op: Square => Square, board: Vector[Vector[Square]]) = {
+
+      val rows = Math.min(pos1.y, pos2.y) to Math.max(pos1.y, pos2.y)
+      val cols = Math.min(pos1.x,pos2.x) to Math.max(pos1.x,pos2.x)
+
+      board.zipWithIndex.map(zipRow => {
+        val (row, i) = zipRow
+        if(rows contains i){
+          val r = row.zipWithIndex
+          r.map( col => {
+            val (value, j) = col
+            if(cols contains j) op(value)
+            else value
+          })
+        }else{
+          row
+        }
+      })
+    }
+
+    override def toString: String = {
+      squares.map(_.map(x => if(hasValue(x)) s" ${x.head.toString} " else " . ").mkString).mkString("\n")
+    }
   }
 
 }

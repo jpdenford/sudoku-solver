@@ -13,3 +13,16 @@ val xs = List(List(1),List(2),List(3),List(),List(4)).grouped(3).toList
 val commentReg = "#.*".r//  = new Regex("""#.*""") //TOD fix to be startswith #
 commentReg.findFirstIn("#123")
 commentReg.findFirstIn("123#123")
+
+val b = Vector(
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1),
+  Vector(1,1,1,1,1,1,1,1,1)
+)
+
