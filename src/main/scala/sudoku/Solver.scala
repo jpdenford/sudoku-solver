@@ -4,34 +4,36 @@ import Solver._
 object Solver {
 
   type Square = Set[Int]
-  type Coord = (Int, Int)
-  //case class Coord(x: Int, y:Int)
+//  type Coord = (Int, Int)
+  case class Coord(x: Int, y:Int)
 
   case class Board(squares: Vector[Vector[Square]]) {
     private val size = 9
 
     def remove(value: Int, position: Coord): Board = {
-      if(!((1 until size) contains value)) throw new IllegalArgumentException("Value should be within range")
+      if(!((1 to size) contains value)) throw new IllegalArgumentException("Value should be within range")
       //remove the value from the board
-      this.update(_.-(value),position)
+      update(_.-(value), position)
     }
 
     def set(value: Int, position: Coord) = {
-      //TODO move update logic to get fn
+      update(_ => Set(value), position)
     }
 
-    private def update(op: Square => Square, position: Coord): Board = {
-      val (x, y) = position
-      val newSquare = op(this.squares(y)(x))
+    private def update(op: Square => Square, pos: Coord): Board = {
+      val newSquare = op(squares(pos.y)(pos.x))
       // TODO if newSquare has only one value then remove the value from quadrant, and col/row
-      val newRow = this.squares(y).updated(x, newSquare)
-      val newTiles = this.squares.updated(y, newRow)
+      if(newSquare.size == 1){
+
+      }
+      val newRow = squares(pos.y).updated(pos.x, newSquare)
+      val newTiles = squares.updated(pos.y, newRow)
       Board(newTiles)
     }
 
-    def get(x: Int, y: Int): Square = squares(y)(x)
+    def get(pos: Coord): Square = squares(pos.y)(pos.x)
 
-    def hasValue(pos: Coord): Boolean = hasValue(squares(pos._2)(pos._1))
+    def hasValue(pos: Coord): Boolean = hasValue(squares(pos.x)(pos.y))
 
     def hasValue(sq: Square):Boolean = sq.size == 1
 
@@ -48,7 +50,7 @@ object Solver {
 
 }
 
-object Do extends App{
-  val board = Board(loadSudoku)
+object Do extends App {
+  val board = loadSudoku.head
   println(board.toString)
 }
