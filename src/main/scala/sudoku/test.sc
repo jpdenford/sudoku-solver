@@ -29,3 +29,5 @@ val b = Vector(
 (9 until 1).toList
 
 (0 to 2).toList
+
+List.fill(9)(List.fill(9)(Set(0 to 9)))

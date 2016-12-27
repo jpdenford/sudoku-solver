@@ -1,7 +1,11 @@
+import sudoku.Solver._
+
 import scala.util.matching.Regex
 
 package object sudoku {
   val dictionaryPath = List("sudoku", "sudokus.txt")
+
+  private val emptyBoard = Board(Vector.fill(9)(Vector.fill(9)((1 to 9).toSet)))
 
   def loadSudoku: List[Solver.Board] = {
     val wordstream = Option {
@@ -12,6 +16,12 @@ package object sudoku {
       sys.error("Could not load word list, dictionary file not found")
     }
     try {
+      // set the squares on the board to their specified values
+      def setupBoard(values: List[(Int, Coord)], board: Board): Board = values match {
+        case Nil => board
+        case (n, c)::rest => setupBoard(rest, board.set(n,c))
+      }
+
       val commentReg = "#.*"
       val s = io.Source.fromInputStream(wordstream)
       val allLines = s.getLines.filter(l => !(l.isEmpty || l.matches(commentReg))).toVector
@@ -19,15 +29,21 @@ package object sudoku {
       val boards = linesByBoard.map { b =>
         val boardLines = b.map(
           line => {
-            val ns = line.toVector
+            val ns = line.toList
             //split string into chars
-            val sets = ns.map({
-              case '0' => (1 until 10).toSet
-              case n => Set(Integer.parseInt(n.toString))
+            val opts = ns.map({
+              case '0' => None
+              case n => Some(Integer.parseInt(n.toString))
             })
-            sets
+            opts
           })
-        val board = Solver.Board(boardLines)
+        val zippedBoard = boardLines.map(_.zipWithIndex).zipWithIndex
+        val values = for {
+          row <- zippedBoard
+          rowCol <- row._1
+          elem <- rowCol._1
+        } yield (elem,Coord(rowCol._2, row._2))
+        val board = setupBoard(values.toList, emptyBoard)
         println("--BOARD--\n" + board)
         board
       }

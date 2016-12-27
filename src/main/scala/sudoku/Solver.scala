@@ -4,7 +4,6 @@ import Solver._
 object Solver {
 
   type Square = Set[Int]
-//  type Coord = (Int, Int)
   case class Coord(x: Int, y:Int)
 
   case class Board(squares: Vector[Vector[Square]]) {
@@ -16,7 +15,8 @@ object Solver {
       update(_.-(value), position)
     }
 
-    def set(value: Int, position: Coord) = {
+    def set(value: Int, position: Coord): Board = {
+      if(!((1 to size) contains value)) throw new IllegalArgumentException("Value should be within range")
       update(_ => Set(value), position)
     }
 
@@ -45,7 +45,21 @@ object Solver {
 
     private def hasValue(sq: Square):Boolean = sq.size == 1
 
-    def isComplete: Boolean = squares.forall(_.forall(_.size == 1))
+    def isComplete: Boolean = squares.forall(_.forall(_.size == 1)) //TODO make more efficient with saved num of completed
+
+    /**
+      * Gives the coordinate of the first square without a value
+      * using order left -> right, top -> bottom
+      * @return
+      */
+    def firstUnknown(): Coord = { //TODO make more efficient with saved index
+      val zip = zipped()
+      val row = zip.find(row => row._1.exists(sq => !hasValue(sq._1))).head
+      val col = row._1.find(sq => !hasValue(sq._1)).get
+      Coord(col._2, row._2)
+    }
+
+    def zipped(): Vector[(Vector[(Square, Int)], Int)] = squares.map(_.zipWithIndex).zipWithIndex
 
     private def mapRow(op: Square => Square, row: Int, board: Vector[Vector[Square]]) =
       board.updated(row, board(row).map(op))
@@ -58,21 +72,13 @@ object Solver {
       val quadSize = 3
       val minX = (pos.x / quadSize) * quadSize
       val minY = (pos.y / quadSize) * quadSize
-      (Coord(minX, minY), Coord(minX + quadSize, minY + quadSize))
+      (Coord(minX, minY), Coord(minX + quadSize - 1, minY + quadSize - 1))
     }
 
     private def mapArea(pos1: Coord, pos2: Coord) (op: Square => Square, board: Vector[Vector[Square]]) = {
       import Math.{min, max}
       val rows = min(pos1.y, pos2.y) to max(pos1.y, pos2.y)
       val cols = min(pos1.x, pos2.x) to max(pos1.x, pos2.x)
-
-//      def mapInRange[A](vec: Vector[A], range: Range, op: A => A): Vector[A] = {
-//        vec.zipWithIndex.map(el => {
-//          val (elem, i) = el
-//          if(range contains i) op(elem)
-//          else elem
-//        })
-//      }
 
       board.zipWithIndex.map(zipRow => {
         val (row, i) = zipRow
@@ -91,12 +97,38 @@ object Solver {
 
     override def toString: String = {
       squares.map(_.map(x => if(hasValue(x)) s" ${x.head.toString} " else " . ").mkString).mkString("\n")
+//      squares.map(_.map(x => {
+//        val vals = x.toList.sorted.mkString
+//        val padding = List.fill(9-vals.length)(" ").mkString
+//        s"|${vals+padding}"
+//      }).mkString).mkString("\n")
+    }
+  }
+
+  def solve(board: Board): Option[Board] = {
+    if(board.isComplete) Some(board)
+    else {
+      val nextCoord = board.firstUnknown() //TODO save iterating twice - combine isComplete with firstUnknown
+      val options = board.get(nextCoord)
+      if(options.isEmpty) None
+      else {
+        println(s"$board\n$nextCoord\n$options\n----\n")
+        val boards = options.toList.sorted.map(i => {
+          println("trying:" + i)
+          solve(board.set(i, nextCoord))
+        }).filter(_.nonEmpty) //lazy eval means okay
+        if(!boards.isEmpty) boards.head
+        else None
+      }
     }
   }
 
 }
 
+class UnsolvableException extends RuntimeException
+
 object Do extends App {
-  val board = loadSudoku.head
-  println(board.toString)
+  val board = loadSudoku(2)
+//  println(board.toString)
+//  solve(board)
 }

@@ -10,21 +10,28 @@ import Solver._
 @RunWith(classOf[JUnitRunner])
 class SudokuSuite extends FunSuite  {
   lazy val boards = loadSudoku
-  val emptyBoard = boards(0)
+  val emptyBoard = boards.head
   val b1 = boards(1)
+//  val b2 = boards(2)
 
   test("getter") {
     assert(b1.get(Coord(0,0)) === Set(2))
     assert(b1.get(Coord(0,8)) === Set(5))
   }
 
-  test("updating board") {
+  test("updating board1") {
     val nb = b1.set(5, Coord(0,0))
     assert(nb.get(Coord(0,0)) === Set(5))
   }
 
+  test("updating board2") {
+    val nb = b1.set(5, Coord(5,7))
+    assert(nb.get(Coord(5,7)) === Set(5))
+  }
+
   test("setting value updates row"){
     val nb = emptyBoard.set(1, Coord(0,0))
+    println(nb)
     assert((1 to 8).map(n => nb.get(Coord(n, 0))) === Vector.fill(8)(Set(2,3,4,5,6,7,8,9)))
   }
 
@@ -44,6 +51,13 @@ class SudokuSuite extends FunSuite  {
     assert(actual.toList === (Set(1)::List.fill(8)(Set(2,3,4,5,6,7,8,9))) )
   }
 
+  test("first unknown"){
+    assert(emptyBoard.firstUnknown() === Coord(0, 0))
+  }
+
+//  test("first unknown2"){
+//    assert(b2.firstUnknown() === Coord(5, 1))
+//  }
 }
 
 
