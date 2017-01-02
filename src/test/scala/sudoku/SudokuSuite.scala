@@ -15,11 +15,11 @@ class SudokuSuite extends FunSuite  {
 //  val b2 = boards(2)
 
   test("getter") {
-    assert(b1.get(Coord(0,0)) === Set(2))
-    assert(b1.get(Coord(0,8)) === Set(5))
+    assert(b1(0) === Set(2))
+    assert(b1(11) === Set(6))
   }
 
-  test("updating board1") {
+  /*test("updating board1") {
     val nb = b1.set(5, Coord(0,0))
     assert(nb.get(Coord(0,0)) === Set(5))
   }
@@ -53,7 +53,11 @@ class SudokuSuite extends FunSuite  {
 
   test("first unknown"){
     assert(emptyBoard.firstUnknown() === Coord(0, 0))
-  }
+  }*/
+
+//  test("index to coord and coord to index") {
+//    assert(getCoord())
+//  }
 
 //  test("first unknown2"){
 //    assert(b2.firstUnknown() === Coord(5, 1))

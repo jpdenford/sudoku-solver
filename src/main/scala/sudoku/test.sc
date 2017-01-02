@@ -26,6 +26,10 @@ val b = Vector(
   Vector(1,1,1,1,1,1,1,1,1)
 )
 
+List(List(None,Some(5)),List(None,Some(4))).flatten
+
+List().foldRight(1)((a, b) => b+1)
+
 (9 until 1).toList
 
 (0 to 2).toList
