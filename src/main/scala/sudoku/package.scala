@@ -5,9 +5,9 @@ import scala.util.matching.Regex
 package object sudoku {
   val dictionaryPath = List("sudoku", "sudokus.txt")
 
-  private val emptyBoard = Board(Vector.fill(9)(Vector.fill(9)((1 to 9).toSet)))
+  private val emptyBoard = SudokuBoard(Vector.fill(9)(Vector.fill(9)((1 to 9).toSet)))
 
-  def loadSudoku: List[Solver.Board] = {
+  def loadSudoku: List[Solver.SudokuBoard] = {
     val wordstream = Option {
       getClass.getResourceAsStream(dictionaryPath.mkString("/"))
     } orElse {
@@ -17,9 +17,12 @@ package object sudoku {
     }
     try {
       // set the squares on the board to their specified values
-      def setupBoard(values: List[(Int, Coord)], board: Board): Board = values match {
+      def setupBoard(values: List[(Int, Coord)], board: SudokuBoard): SudokuBoard = values match {
         case Nil => board
-        case (n, c)::rest => setupBoard(rest, board.set(n,c))
+        case (n, c)::rest => {
+//          println("\n\n"+board)
+          setupBoard(rest, board.set(n,c))
+        }
       }
 
       val commentReg = "#.*"
