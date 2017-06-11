@@ -1,7 +1,6 @@
 package sudoku
 import Solver._
 
-import scala.collection.mutable
 
 object Solver {
 
@@ -11,23 +10,39 @@ object Solver {
   case class Coord(x: Int, y:Int)
 
   case class Area(a: Coord, b: Coord){
-    def in(c: Coord): Boolean = c.x <= b.x && c.x >= a.x && c.y <= b.y && c.y >= a.y
+    def contains(c: Coord): Boolean = c.x <= b.x && c.x >= a.x && c.y <= b.y && c.y >= a.y
   }
 
   val BOARD_SIZE = 9
 
+  def isSolved(board: Board): Boolean = {
+    (0 to 8).forall(i => {
+      val emptySet = Set[Int]()
+      ((0 to 8).foldLeft(emptySet)((set, j) => (set + board(j*9+i).head)) diff (1 to 9).toSet).isEmpty &&
+        ((0 to 8).foldLeft(emptySet)((set, j) => (set + board(j+i*9).head)) diff (1 to 9).toSet).isEmpty // TODO do this, make sure all numbers are there (not just that it adds up)
+    })
+
+  }
+
   def solve(board: Board): Option[Board] = {
     val nextInd = firstUnknownIndex(board)
+//    if(nextInd.isEmpty && isSolved(board)) return Some(board)
     println("Solve:\n"+nextInd+"\n"+stringify(board))
-    if(nextInd.isEmpty) Some(board)
-    else {
-      val index = nextInd.get
-      val solutions = for {
-        n <- board(index)
-        sol <- solve(set(index, n, board))
-        if(sol.forall())
-      } yield sol
-      solutions.headOption
+//    println("Solve:\n"+nextInd)
+    nextInd match {
+      case None => Some(board)
+      case Some(index) => {
+//        val solutions = for {
+//          n <- board(index)
+//          val solution = set(index, n, board)
+//          if(!solution.isEmpty)
+//          sol <- solve(solution.get)
+//        } yield sol
+//        if(solutions.isEmpty) None
+//        else Some(solutions.head)
+        val possibleVals = board(index)
+        possibleVals.flatMap(n => set(index, n, board)).flatMap(b => solve(b)).headOption
+      }
     }
   }
 
@@ -46,25 +61,12 @@ object Solver {
     * @param board the board
     * @return
     */
-  def set(index: Int, value: Int, board: Board): Board = {
-    val pos = getCoord(index)
-    val colUpdated = mapCol(_.-(value), getCoord(index).x, board)
-    val rowUpdated = mapRow(_.-(value), getCoord(index).y, colUpdated)
-    val areaUpdated = mapQuad(_.-(value), getQuadrant(index), rowUpdated)
-    val squareUpdated = areaUpdated.updated(index, Set(value))
-
-    //recursively update all newly single squares
-    val indecesToUpdate = changedIndices(board, areaUpdated).filter(x => hasValue(areaUpdated(x)))
-//    println("need to subset: " + indecesToUpdate)
-    def subSet(board: Board, index: Int): Board = {
-      if(board(index).isEmpty) board
-      else set(index, board(index).head, board)
-    }
-
-    indecesToUpdate.foldLeft(squareUpdated)(subSet)
+  def set(index: Int, value: Int, board: Board): Option[Board] = {
+    val newBoard = mapBoard(_.-(value), connectedSquares(index), board, index)
+    newBoard.map(b => b.updated(index, Set(value)))
   }
 
-  def getQuadrant(index: Int): Area = { //TODO fix
+  def getQuadrant(index: Int): Area = {
     val pos = getCoord(index)
     val quadSize = 3
     val minX = (pos.x / quadSize) * quadSize
@@ -72,19 +74,50 @@ object Solver {
     Area(Coord(minX, minY), Coord(minX + quadSize - 1, minY + quadSize - 1))
   }
 
-  def mapCol(op: Square => Square, n: Int, board: Board): Board = mapBoard(op, i => getCoord(i).x == n, board)
+  def connectedSquares(n: Int): Int => Boolean = {
+    val isInCol = column(n)
+    val isInRow = row(n)
+    val isInQuad = quad(n)
+    (i: Int) => (i != n) && (isInCol(i) || isInRow(i) || isInQuad(i))
+  }
 
-  def mapRow(op: Square => Square, n: Int, board: Board): Board = mapBoard(op, i => getCoord(i).y == n, board)
+  def column(n: Int): Int => Boolean = {
+    val col = getCoord(n).x
+    i => getCoord(i).x == col
+  }
 
-  def mapQuad(op: Square => Square, quad: Area, board: Board): Board = mapBoard(op, i => quad in getCoord(i), board)
+  def row(n: Int): Int => Boolean = {
+    val row = getCoord(n).y
+    i => getCoord(i).y == row
+  }
 
-  def mapBoard(op: Square => Square, pred: Int => Boolean, board: Board): Board = {
-    var needUpdate: mutable.MutableList[Int] = mutable.MutableList()
-    val firstUpdate = board.zipWithIndex.map(e => {
-      if(pred(e._2)) op(e._1)
-      else e._1
-    })
-    firstUpdate
+  def quad(n: Int): Int => Boolean = {
+    val quad = getQuadrant(n)
+    i => quad contains getCoord(i)
+  }
+
+  /***
+    * Map an operation over a board for the valid squares
+    * Option will contain board if operation is valid for all mapped squares
+    * @param op
+    * @param pred predicate for applying op to square
+    * @param board
+    * @return
+    */
+  def mapBoard(op: Square => Square, pred: Int => Boolean, board: Board, workingIndex: Int): Option[Board] = {
+    def map(board: Board, index: Int): Option[Board] = {
+      if(index >= board.size) return Some(board)
+      if(!pred(index)) return map(board, index + 1)   // TODO move workingindex check into the pred builder
+      val newBoard = board.updated(index, op(board(index)))
+      if(newBoard(index).isEmpty) return None // operation was invalid as square now empty
+      else if(newBoard(index).size == 1 && board(index).size != 1){ //operation made this square single value
+        val boardUpdated = set(index, newBoard(index).head, newBoard)
+        if(boardUpdated.isEmpty) return None // couldn't continue with update
+        else return map(boardUpdated.get, index + 1) // successful, continue
+      }
+      return map(newBoard, index + 1)
+    }
+    map(board, 0)
   }
 
   def getIndex(col: Int, row: Int): Int = row * BOARD_SIZE + col
@@ -92,14 +125,10 @@ object Solver {
   def getCoord(index: Int): Coord = Coord(index % BOARD_SIZE, index / BOARD_SIZE)
 
   def stringify(squares: Board): String = {
-//    squares.grouped(BOARD_SIZE).map(
-//      _.map(
-//        x => if(hasValue(x)) s" ${x.head.toString} " else " . "
-//      ).mkString).mkString("\n")
     squares.grouped(BOARD_SIZE).map(_.map(x => {
       val vals = x.toList.sorted.mkString
-      val padding = List.fill(9-vals.length)(" ").mkString
-      s"|${vals+padding}"
+      val padding = List.fill(9 - vals.length)(" ").mkString
+      s"|${vals + padding}"
     }).mkString).mkString("\n")
   }
 
@@ -110,6 +139,10 @@ object Solver {
 class UnsolvableException extends RuntimeException
 
 object Do extends App {
-  val board = loadSudoku(2)
-  println(stringify(solve(board).get))
+  val board = loadSudoku(3)
+  println("starting:\n"+stringify(board))
+  val solvedBoard = solve(board).get
+  println("---------------SOLVED-----------------")
+  println(stringify(solvedBoard))
 }
+

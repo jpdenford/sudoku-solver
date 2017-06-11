@@ -19,7 +19,7 @@ package object sudoku {
       // set the squares on the board to their specified values
       def setupBoard(values: List[(Int, Int)], board: Board): Board = values match {
         case Nil => board
-        case (n, i)::rest => setupBoard(rest, set(i, n, board))
+        case (n, i)::rest => setupBoard(rest, set(i, n, board).get)
       }
 
       val commentReg = "#.*"
