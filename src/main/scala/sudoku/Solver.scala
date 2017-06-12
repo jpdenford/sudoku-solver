@@ -15,42 +15,33 @@ object Solver {
 
   val BOARD_SIZE = 9
 
+  /***
+    * Check all rows and colums have values 1 - 9
+    * @param board
+    * @return
+    */
   def isSolved(board: Board): Boolean = {
     (0 to 8).forall(i => {
       val emptySet = Set[Int]()
       ((0 to 8).foldLeft(emptySet)((set, j) => (set + board(j*9+i).head)) diff (1 to 9).toSet).isEmpty &&
-        ((0 to 8).foldLeft(emptySet)((set, j) => (set + board(j+i*9).head)) diff (1 to 9).toSet).isEmpty // TODO do this, make sure all numbers are there (not just that it adds up)
+      ((0 to 8).foldLeft(emptySet)((set, j) => (set + board(j+i*9).head)) diff (1 to 9).toSet).isEmpty
     })
-
   }
 
   def solve(board: Board): Option[Board] = {
-    val nextInd = firstUnknownIndex(board)
-//    if(nextInd.isEmpty && isSolved(board)) return Some(board)
-    println("Solve:\n"+nextInd+"\n"+stringify(board))
-//    println("Solve:\n"+nextInd)
-    nextInd match {
+    val nextUnsolvedIndex = firstUnknownIndex(board)
+    nextUnsolvedIndex match {
       case None => Some(board)
       case Some(index) => {
-//        val solutions = for {
-//          n <- board(index)
-//          val solution = set(index, n, board)
-//          if(!solution.isEmpty)
-//          sol <- solve(solution.get)
-//        } yield sol
-//        if(solutions.isEmpty) None
-//        else Some(solutions.head)
         val possibleVals = board(index)
-        possibleVals.flatMap(n => set(index, n, board)).flatMap(b => solve(b)).headOption
+        possibleVals.view.flatMap(n => set(index, n, board)).flatMap(b => solve(b)).headOption
       }
     }
   }
 
-  def firstUnknownIndex(board: Board): Option[Int] = board.zipWithIndex.find(x => !hasValue(x._1)).flatMap(x => Some(x._2))
+  def hasValue(sq: Square):Boolean = sq.size == 1
 
-  def changedIndices(a: Board, b: Board): Vector[Int] = {
-    a.zip(b).zipWithIndex.filter(x => x._1._1 != x._1._2).map(_._2)
-  }
+  def firstUnknownIndex(board: Board): Option[Int] = board.zipWithIndex.find(x => !hasValue(x._1)).flatMap(x => Some(x._2))
 
   /**
     * Set the value at the given index
@@ -62,9 +53,16 @@ object Solver {
     * @return
     */
   def set(index: Int, value: Int, board: Board): Option[Board] = {
-    val newBoard = mapBoard(_.-(value), connectedSquares(index), board, index)
-    newBoard.map(b => b.updated(index, Set(value)))
+    val newBoard = mapBoard(_ - value, connectedSquares(index), board)
+    newBoard.map(b => b.updated(index, Set(value))) // set the actual square
   }
+
+  /***
+    * Get a coordinate of a square given the index
+    * @param index
+    * @return
+    */
+  def getCoord(index: Int): Coord = Coord(index % BOARD_SIZE, index / BOARD_SIZE)
 
   def getQuadrant(index: Int): Area = {
     val pos = getCoord(index)
@@ -74,26 +72,23 @@ object Solver {
     Area(Coord(minX, minY), Coord(minX + quadSize - 1, minY + quadSize - 1))
   }
 
+  /***
+    * Returns a predicate which tests if a given index i is in
+    * the same row, column or quadrant as n (excluding actual index)
+    * @param n
+    * @return predicate function
+    */
   def connectedSquares(n: Int): Int => Boolean = {
-    val isInCol = column(n)
-    val isInRow = row(n)
-    val isInQuad = quad(n)
-    (i: Int) => (i != n) && (isInCol(i) || isInRow(i) || isInQuad(i))
-  }
+    val coordN = getCoord(n)
+    val quadN = getQuadrant(n)
 
-  def column(n: Int): Int => Boolean = {
-    val col = getCoord(n).x
-    i => getCoord(i).x == col
-  }
+    val inColumn: Int => Boolean = i => getCoord(i).x == coordN.x
 
-  def row(n: Int): Int => Boolean = {
-    val row = getCoord(n).y
-    i => getCoord(i).y == row
-  }
+    val inRow: Int => Boolean = i => getCoord(i).y == coordN.y
 
-  def quad(n: Int): Int => Boolean = {
-    val quad = getQuadrant(n)
-    i => quad contains getCoord(i)
+    val inQuad: Int => Boolean = i => quadN contains getCoord(i)
+    // not including original index n
+    (i: Int) => (i != n) && (inColumn(i) || inRow(i) || inQuad(i))
   }
 
   /***
@@ -104,10 +99,10 @@ object Solver {
     * @param board
     * @return
     */
-  def mapBoard(op: Square => Square, pred: Int => Boolean, board: Board, workingIndex: Int): Option[Board] = {
+  def mapBoard(op: Square => Square, pred: Int => Boolean, board: Board): Option[Board] = {
     def map(board: Board, index: Int): Option[Board] = {
       if(index >= board.size) return Some(board)
-      if(!pred(index)) return map(board, index + 1)   // TODO move workingindex check into the pred builder
+      if(!pred(index)) return map(board, index + 1)
       val newBoard = board.updated(index, op(board(index)))
       if(newBoard(index).isEmpty) return None // operation was invalid as square now empty
       else if(newBoard(index).size == 1 && board(index).size != 1){ //operation made this square single value
@@ -120,19 +115,13 @@ object Solver {
     map(board, 0)
   }
 
-  def getIndex(col: Int, row: Int): Int = row * BOARD_SIZE + col
-
-  def getCoord(index: Int): Coord = Coord(index % BOARD_SIZE, index / BOARD_SIZE)
-
   def stringify(squares: Board): String = {
     squares.grouped(BOARD_SIZE).map(_.map(x => {
-      val vals = x.toList.sorted.mkString
-      val padding = List.fill(9 - vals.length)(" ").mkString
-      s"|${vals + padding}"
+      val vals = if(x.size == 1) x.head.toString else ""
+      val padding = List.fill(2 - vals.length)(" ").mkString
+      s"| ${vals + padding}"
     }).mkString).mkString("\n")
   }
-
-  def hasValue(sq: Square):Boolean = sq.size == 1
 
 }
 
@@ -140,9 +129,12 @@ class UnsolvableException extends RuntimeException
 
 object Do extends App {
   val board = loadSudoku(3)
+  val start = System.currentTimeMillis()
   println("starting:\n"+stringify(board))
   val solvedBoard = solve(board).get
+  val end = System.currentTimeMillis()
   println("---------------SOLVED-----------------")
   println(stringify(solvedBoard))
+  println("Took: " + (end - start) + " millis")
 }
 
