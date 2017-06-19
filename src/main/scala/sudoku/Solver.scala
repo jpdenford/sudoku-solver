@@ -2,6 +2,7 @@ package sudoku
 
 import Solver._
 
+import scala.annotation.tailrec
 
 object Solver {
 
@@ -35,8 +36,13 @@ object Solver {
     nextUnsolvedIndex match {
       case None => Some(board)
       case Some(index) => {
-        val possibleVals = board(index)
-        possibleVals.view.flatMap(n => set(index, n, board)).flatMap(b => solve(b)).headOption
+        val possibleValues = board(index).view // want this to be lazy
+        val solutions = for {
+          n <- possibleValues
+          newBoard <- setSquare(index, n, board) // try this value on the current square
+          solution <- solve(newBoard) // solve the rest
+        } yield solution
+        solutions.headOption
       }
     }
   }
@@ -54,7 +60,7 @@ object Solver {
     * @param board the board
     * @return
     */
-  def set(index: Int, value: Int, board: Board): Option[Board] = {
+  def setSquare(index: Int, value: Int, board: Board): Option[Board] = {
     mapBoard(_ - value, connectedSquares(index), board)
       .map(b => b.updated(index, Set(value))) // set the actual square
   }
@@ -77,7 +83,7 @@ object Solver {
 
   /** *
     * Returns a predicate which tests if a given index i is in
-    * the same row, column or quadrant as n (excluding actual index)
+    * the same row, column or quadrant as n (excluding n)
     *
     * @param n
     * @return predicate function
@@ -91,7 +97,7 @@ object Solver {
     val inRow: Int => Boolean = i => getCoord(i).y == coordN.y
 
     val inQuad: Int => Boolean = i => quadN contains getCoord(i)
-    // not including original index n
+    // we don't want to include the actual index
     (i: Int) => (i != n) && (inColumn(i) || inRow(i) || inQuad(i))
   }
 
@@ -105,20 +111,21 @@ object Solver {
     * @return
     */
   def mapBoard(op: Square => Square, pred: Int => Boolean, board: Board): Option[Board] = {
+    @tailrec
     def map(board: Board, index: Int): Option[Board] = {
-      if (index >= board.size) return Some(board)
-      if (!pred(index)) return map(board, index + 1)
-      val newBoard = board.updated(index, op(board(index)))
-      if (newBoard(index).isEmpty) return None // operation was invalid as square now empty
-      else if (newBoard(index).size == 1 && board(index).size != 1) {
-        //operation made this square single value
-        val boardUpdated = set(index, newBoard(index).head, newBoard)
-        if (boardUpdated.isEmpty) return None // couldn't continue with update
-        else return map(boardUpdated.get, index + 1) // successful, continue
+      if (index >= board.size) Some(board)
+      else if (!pred(index)) map(board, index + 1) // skip
+      else {
+        val newBoard = board.updated(index, op(board(index)))
+        if (newBoard(index).isEmpty) None // operation was invalid as square now empty
+        else if (newBoard(index).size == 1 && board(index).size > 1) { // now a single value
+          val boardUpdated = setSquare(index, newBoard(index).head, newBoard)
+          if (boardUpdated.isEmpty) None // couldn't continue with update
+          else map(boardUpdated.get, index + 1) // successful, continue
+        }
+        else map(newBoard, index + 1)
       }
-      return map(newBoard, index + 1)
     }
-
     map(board, 0)
   }
 
