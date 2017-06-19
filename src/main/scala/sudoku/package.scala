@@ -1,17 +1,15 @@
 import sudoku.Solver._
 
-import scala.util.matching.Regex
-
 package object sudoku {
-  val dictionaryPath = List("sudoku", "sudokus.txt")
+  val boardsPath = List("sudoku", "sudokus.txt")
 
-  private val emptyBoard = Vector.fill(9*9)((1 to 9).toSet)
+  private val emptyBoard = Vector.fill(9 * 9)((1 to 9).toSet)
 
   def loadSudoku: List[Board] = {
-    val wordstream = Option {
-      getClass.getResourceAsStream(dictionaryPath.mkString("/"))
+    val boardStream = Option {
+      getClass.getResourceAsStream(boardsPath.mkString("/"))
     } orElse {
-      common.resourceAsStreamFromSrc(dictionaryPath)
+      common.resourceAsStreamFromSrc(boardsPath)
     } getOrElse {
       sys.error("Could not load word list, dictionary file not found")
     }
@@ -19,41 +17,28 @@ package object sudoku {
       // set the squares on the board to their specified values
       def setupBoard(values: List[(Int, Int)], board: Board): Board = values match {
         case Nil => board
-        case (n, i)::rest => setupBoard(rest, set(i, n, board).get)
+        case (n, i) :: rest => {
+          val updated = setSquare(i, n, board).getOrElse(throw new UnsolvableException)
+          setupBoard(rest, updated)
+        }
       }
 
       val commentReg = "#.*"
-      val s = io.Source.fromInputStream(wordstream)
-      val allLines = s.getLines.filter(l => !(l.isEmpty || l.matches(commentReg))).toVector
-      val linesByBoard = allLines.grouped(9).toList
-
-      val boards = linesByBoard.map { b =>
-        val boardLines = b.map (
-          line => {
-            val ns = line.toList
-            //split string into chars
-            val opts = ns.map({
-              case '0' => None
-              case n => Some(Integer.parseInt(n.toString))
-            })
-            opts
-          })
-        val zippedBoard = boardLines.flatten.zipWithIndex
-        val values = for {
-          elem <- zippedBoard
-          value <- elem._1
-        } yield (value, elem._2)
-        val board = setupBoard(values.toList, emptyBoard)
-        println("--LOADED BOARD--\n" + stringify(board))
-        board
-      }
-      boards
+      val s = io.Source.fromInputStream(boardStream)
+      val allLines = s.getLines.filter(l => !(l.isEmpty || l.matches(commentReg)))
+      val boardGroups = allLines.grouped(9).map(_.flatten.map(c => Integer.parseInt(c.toString)))
+      val boards = for {
+        boardLines <- boardGroups
+        toUpdate = boardLines.zipWithIndex.filter(_._1 != 0)
+        board = setupBoard(toUpdate.toList, emptyBoard)
+      } yield board
+      boards.toList
     } catch {
       case e: Exception =>
-        println("Could not load word list: " + e)
+        println("Could not load sudokus: " + e)
         throw e
     } finally {
-      wordstream.close()
+      boardStream.close()
     }
   }
 

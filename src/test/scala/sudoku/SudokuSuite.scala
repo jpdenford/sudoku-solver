@@ -19,7 +19,7 @@ class SudokuSuite extends FunSuite  {
   }
 
   test("updating board1") {
-    val nb = set(1, 5, b1).get
+    val nb = setSquare(1, 5, b1).get
     assert(nb(1) === Set(5))
   }
 
