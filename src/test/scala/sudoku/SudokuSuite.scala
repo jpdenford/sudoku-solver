@@ -18,9 +18,9 @@ class SudokuSuite extends FunSuite  {
     assert(b1(11) === Set(6))
   }
 
-  test("updating board1") {
-    val nb = setSquare(1, 5, b1).get
-    assert(nb(1) === Set(5))
+  test("setting square to single value") {
+    val updatedBoard = setSquare(1, 5, b1).get
+    assert(updatedBoard(1) === Set(5))
   }
 
   test("first unknown square") {
@@ -29,9 +29,11 @@ class SudokuSuite extends FunSuite  {
   }
 
   test("connectedSquares") {
-    println("----------\n" + stringify((0 to 80).toVector.map(x => Set(x))))
-    assert((0 to 80).filter(connectedSquares(0)).sorted === Vector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 18, 19, 20, 27, 36, 45, 54, 63, 72))
-    assert((0 to 80).filter(connectedSquares(39)).sorted === Vector(3, 12, 21, 30, 31, 32, 36, 37, 38, 39, 40, 41, 42, 43, 44, 48, 49, 50, 57, 66, 75))
+    val indices = (0 to 80)
+    // top left
+    assert(indices.filter(connectedSquares(0)).sorted === Vector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 18, 19, 20, 27, 36, 45, 54, 63, 72))
+    // somewhere in the middle of the board
+    assert(indices.filter(connectedSquares(39)).sorted === Vector(3, 12, 21, 30, 31, 32, 36, 37, 38, 39, 40, 41, 42, 43, 44, 48, 49, 50, 57, 66, 75))
   }
 
 }
