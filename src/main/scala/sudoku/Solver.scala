@@ -3,6 +3,7 @@ package sudoku
 import Solver._
 
 import scala.annotation.tailrec
+import scala.io.StdIn
 
 object Solver {
 
@@ -163,14 +164,21 @@ object Solver {
 class UnsolvableException extends RuntimeException
 
 object Do extends App {
-  val board = loadSudoku(3)
-  println("starting:\n" + prettyPrint(board))
-  val startTime = System.currentTimeMillis
-  val boardSolution = solve(board)
-  val endTime = System.currentTimeMillis
-  println("-------------FINSHED---------------")
-  val solution = boardSolution.getOrElse(throw new UnsolvableException)
-  println(prettyPrint(solution))
-  println("Took: " + (endTime - startTime) + " ms")
+  val boardStrings = Iterator.continually(StdIn.readLine())
+    .takeWhile(line => line != null && line.nonEmpty)
+
+  var total: Double = 0
+  var n: Double = 0
+  boardStrings.foreach(line => {
+    val ints = line.map(c => Integer.parseInt(c.toString)).toList
+    val startTime = System.currentTimeMillis()
+    val board = loadSudoku(ints).flatMap(b => solve(b))
+    val endTime = System.currentTimeMillis()
+    total += (endTime - startTime)
+    n += 1
+    println("-------------FINSHED---------------")
+    if(board.nonEmpty) println(prettyPrint(board.get))
+  })
+  println(n + " solved, average time: " + (total / n))
 }
 

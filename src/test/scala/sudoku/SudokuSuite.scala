@@ -9,7 +9,7 @@ import Solver._
 
 @RunWith(classOf[JUnitRunner])
 class SudokuSuite extends FunSuite  {
-  lazy val boards = loadSudoku
+  lazy val boards = loadSudokus
   val emptyBoard = boards.head
   val b1 = boards(1)
 
