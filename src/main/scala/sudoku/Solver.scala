@@ -18,23 +18,6 @@ object Solver {
 
   val BOARD_SIZE = 9
 
-  /** *
-    * Check all rows and colums have values 1 through 9
-    * TODO should check size of each square since a square may have multiple values
-    *
-    * @param board board which is checked for validity
-    * @return
-    */
-  def isSolved(board: Board): Boolean = {
-    (0 until BOARD_SIZE).forall(i => {
-      val emptySet = Set[Int]()
-      val desired = (1 to BOARD_SIZE).toSet
-      val rowValues = (0 until BOARD_SIZE).foldLeft(emptySet)((set, j) => set + board(j * BOARD_SIZE + i).head)
-      val colValues = (0 until BOARD_SIZE).foldLeft(emptySet)((set, j) => set + board(j + i * BOARD_SIZE).head)
-      rowValues == desired && colValues == desired
-    })
-  }
-
   /**
     * Takes a board and does a depth first search to find a solution
     *
@@ -58,15 +41,20 @@ object Solver {
     }
   }
 
-  def isSet(sq: Square): Boolean = sq.size == 1
+  /***
+    * Check if a given square has a single value aka. it has been set
+    * @param square
+    * @return
+    */
+  private def isSet(square: Square): Boolean = square.size == 1
 
   /***
-    * Get the first index which isn't set
+    * Get the first index which isn't set or None if board is full
     *
     * @param board board to search
     * @return
     */
-  def firstUnknownIndex(board: Board): Option[Int] = board.zipWithIndex.find(x => !isSet(x._1)).flatMap(x => Some(x._2))
+  private def firstUnknownIndex(board: Board): Option[Int] = board.zipWithIndex.find(x => !isSet(x._1)).flatMap(x => Some(x._2))
 
   /**
     * Set the value at the given index.
@@ -113,7 +101,7 @@ object Solver {
     val inRow: Int => Boolean = i => getCoordinate(i).y == nCoord.y
 
     val inQuad: Int => Boolean = i => nQuad contains getCoordinate(i)
-    // note we don't want to include the actual index
+    // we don't want to include the actual index
     (i: Int) => (i != n) && (inColumn(i) || inRow(i) || inQuad(i))
   }
 
@@ -134,9 +122,8 @@ object Solver {
       else if (!pred(index)) map(board, index + 1) // skip
       else {
         val newBoard = board.updated(index, op(board(index)))
-        if (newBoard(index).isEmpty) None // operation was invalid as square now empty
-        else if (newBoard(index).size == 1 && board(index).size > 1) {
-          // now a single value
+        if (newBoard(index).isEmpty) None // operation was invalid
+        else if (newBoard(index).size == 1 && board(index).size > 1) { // now a single value
           val boardUpdated = setSquare(index, newBoard(index).head, newBoard)
           if (boardUpdated.isEmpty) None // couldn't continue with update
           else map(boardUpdated.get, index + 1) // successful, continue
@@ -159,6 +146,12 @@ object Solver {
       ).mkString("\n")
   }
 
+  def linePrint(board: Board): String = {
+    board.map( square => {
+        if (square.size == 1) square.head.toString else "0"
+      }).mkString
+  }
+
 }
 
 class UnsolvableException extends RuntimeException
@@ -167,18 +160,20 @@ object Do extends App {
   val boardStrings = Iterator.continually(StdIn.readLine())
     .takeWhile(line => line != null && line.nonEmpty)
 
-  var total: Double = 0
-  var n: Double = 0
-  boardStrings.foreach(line => {
+  val times = boardStrings.foldRight(List[Long]())((line, nums) => {
     val ints = line.map(c => Integer.parseInt(c.toString)).toList
     val startTime = System.currentTimeMillis()
     val board = loadSudoku(ints).flatMap(b => solve(b))
     val endTime = System.currentTimeMillis()
-    total += (endTime - startTime)
-    n += 1
-    println("-------------FINSHED---------------")
-    if(board.nonEmpty) println(prettyPrint(board.get))
+    val time = endTime - startTime
+    // println("-------------FINSHED---------------")
+    if(board.nonEmpty) println(linePrint(board.get))
+    time::nums
   })
-  println(n + " solved, average time: " + (total / n))
+
+  val count = times.length
+  val total = times.sum.toDouble
+
+  println(s" $count solved\nAverage time: ${total/count}")
 }
 
