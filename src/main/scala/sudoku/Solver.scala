@@ -10,7 +10,14 @@ object Solver {
   type Square = Set[Int]
   type Board = Vector[Square]
 
+  /** Represents a sudoku problem with some pre-computed data like size and quadrant size */
+  case class Problem(board: Board, quadrantSize: Int, size: Int)
+
   case class Coord(x: Int, y: Int)
+
+  object Coord {
+    def fromIndex(index: Int, boardSize: Int) = Coord(index % boardSize, index / boardSize)
+  }
 
   case class Area(topLeft: Coord, bottomRight: Coord) {
     def contains(c: Coord): Boolean = c.x <= bottomRight.x && c.x >= topLeft.x && c.y <= bottomRight.y && c.y >= topLeft.y
@@ -42,11 +49,12 @@ object Solver {
   }
 
   /***
-    * Check if a given square has a single value aka. it has been set
-    * @param square
+    * See if the given square is solved aka. has a single value
+    *
+    * @param sq
     * @return
     */
-  private def isSet(square: Square): Boolean = square.size == 1
+  def hasKnownValue(sq: Square): Boolean = sq.size == 1
 
   /***
     * Get the first index which isn't set or None if board is full
@@ -54,7 +62,10 @@ object Solver {
     * @param board board to search
     * @return
     */
-  private def firstUnknownIndex(board: Board): Option[Int] = board.zipWithIndex.find(x => !isSet(x._1)).flatMap(x => Some(x._2))
+  def firstUnknownIndex(board: Board): Option[Int] = board
+    .zipWithIndex
+    .find(x => !hasKnownValue(x._1))
+    .flatMap(x => Some(x._2))
 
   /**
     * Set the value at the given index.
@@ -66,23 +77,21 @@ object Solver {
     * @return
     */
   def setSquare(index: Int, value: Int, board: Board): Option[Board] = {
-    mapBoard(_ - value, connectedSquares(index), board)
-      .map(b => b.updated(index, Set(value))) // set the actual square
+//    val quadrantSize = Math.sqrt(board.size).toInt
+    mapBoard(_ - value, connectedSquares(index), board) // remove the value from the connected squares
+      .map(b => b.updated(index, Set(value))) // then set the actual square
   }
 
-  /** *
-    * Get cartesian coordinate of a square given the index
+  /***
+    * Get the quadrant which includes the given coordinate
     *
-    * @param index index in 1dimensional board
-    * @return
+    * @param pos the coordinate of the square
+    * @return Area representing the quadrant
     */
-  def getCoordinate(index: Int): Coord = Coord(index % BOARD_SIZE, index / BOARD_SIZE)
-
-  def getQuadrant(pos: Coord): Area = {
-    val quadSize = 3
-    val minX = (pos.x / quadSize) * quadSize
-    val minY = (pos.y / quadSize) * quadSize
-    Area(Coord(minX, minY), Coord(minX + quadSize - 1, minY + quadSize - 1))
+  def getQuadrant(pos: Coord, quadrantSize: Int): Area = {
+    val minX = (pos.x / quadrantSize) * quadrantSize
+    val minY = (pos.y / quadrantSize) * quadrantSize
+    Area(Coord(minX, minY), Coord(minX + quadrantSize - 1, minY + quadrantSize - 1))
   }
 
   /** *
@@ -93,21 +102,22 @@ object Solver {
     * @return predicate function
     */
   def connectedSquares(n: Int): Int => Boolean = {
-    val nCoord = getCoordinate(n)
-    val nQuad = getQuadrant(nCoord)
+    val quadrantSize = 3 // TODO replace with argument
+    val nCoord =  Coord.fromIndex(n, BOARD_SIZE)
+    val nQuad = getQuadrant(nCoord, quadrantSize)
 
-    val inColumn: Int => Boolean = i => getCoordinate(i).x == nCoord.x
+    val inColumn: Int => Boolean = i => Coord.fromIndex(i, BOARD_SIZE).x == nCoord.x
 
-    val inRow: Int => Boolean = i => getCoordinate(i).y == nCoord.y
+    val inRow: Int => Boolean = i => Coord.fromIndex(i, BOARD_SIZE).y == nCoord.y
 
-    val inQuad: Int => Boolean = i => nQuad contains getCoordinate(i)
-    // we don't want to include the actual index
+    val inQuad: Int => Boolean = i => nQuad contains Coord.fromIndex(i, BOARD_SIZE)
+    // note we don't want to include the actual index
     (i: Int) => (i != n) && (inColumn(i) || inRow(i) || inQuad(i))
   }
 
   /** *
     * Map an operation over a board for the valid squares
-    * Option will contain board if operation is valid for all mapped squares
+    * Option result will contain board if operation is valid for all mapped squares
     *
     * @param op    operation to apply to squares
     * @param pred  predicate for applying op to square
@@ -122,8 +132,8 @@ object Solver {
       else if (!pred(index)) map(board, index + 1) // skip
       else {
         val newBoard = board.updated(index, op(board(index)))
-        if (newBoard(index).isEmpty) None // operation was invalid
-        else if (newBoard(index).size == 1 && board(index).size > 1) { // now a single value
+        if (newBoard(index).isEmpty) None // operation was invalid as square is now empty
+        else if (newBoard(index).size == 1 && board(index).size > 1) { // the square is now solved
           val boardUpdated = setSquare(index, newBoard(index).head, newBoard)
           if (boardUpdated.isEmpty) None // couldn't continue with update
           else map(boardUpdated.get, index + 1) // successful, continue
