@@ -7,18 +7,19 @@ import scala.io.StdIn
 
 object Solver {
 
-  type Square = Set[Int]
+  type Square = Set[Int] // a square is a set of possible values
   type Board = Vector[Square]
 
   /** Represents a sudoku problem with some pre-computed data like size and quadrant size */
   case class Problem(board: Board, quadrantSize: Int, size: Int)
 
+  /** Coordinate which is useful for some operations */
   case class Coord(x: Int, y: Int)
 
   object Coord {
     def fromIndex(index: Int, boardSize: Int) = Coord(index % boardSize, index / boardSize)
   }
-
+  /** Area which is useful for some operations */
   case class Area(topLeft: Coord, bottomRight: Coord) {
     def contains(c: Coord): Boolean = c.x <= bottomRight.x && c.x >= topLeft.x && c.y <= bottomRight.y && c.y >= topLeft.y
   }
@@ -39,8 +40,8 @@ object Solver {
         // use a view as we only take the first solution to the board
         val possibleValues = board(index).view
         val solutions = for {
-          n <- possibleValues
-          newBoard <- setSquare(index, n, board) // try this value on the current square
+          number <- possibleValues
+          newBoard <- setSquare(index, number, board) // try this value on the current square
           solution <- solve(newBoard) // solve the rest
         } yield solution
         solutions.headOption
@@ -156,6 +157,11 @@ object Solver {
       ).mkString("\n")
   }
 
+  /***
+    * Print a board as a series of numbers with 0 where no value was found
+    * @param board
+    * @return
+    */
   def linePrint(board: Board): String = {
     board.map( square => {
         if (square.size == 1) square.head.toString else "0"
@@ -164,26 +170,23 @@ object Solver {
 
 }
 
-class UnsolvableException extends RuntimeException
-
 object Do extends App {
   val boardStrings = Iterator.continually(StdIn.readLine())
     .takeWhile(line => line != null && line.nonEmpty)
 
-  val times = boardStrings.foldRight(List[Long]())((line, nums) => {
-    val ints = line.map(c => Integer.parseInt(c.toString)).toList
+  val times = boardStrings.foldRight(List[Long]())((line, times) => {
+    val numbers = line.map(c => Integer.parseInt(c.toString)).toList
     val startTime = System.currentTimeMillis()
-    val board = loadSudoku(ints).flatMap(b => solve(b))
+    val board = loadSudoku(numbers).flatMap(b => solve(b))
     val endTime = System.currentTimeMillis()
     val time = endTime - startTime
-    // println("-------------FINSHED---------------")
     if(board.nonEmpty) println(linePrint(board.get))
-    time::nums
+    time::times
   })
 
   val count = times.length
   val total = times.sum.toDouble
 
-  println(s" $count solved\nAverage time: ${total/count}")
+  println(s"Finished, $count sudokus solved\nAverage time: ${total/count}")
 }
 
