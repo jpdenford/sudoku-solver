@@ -7,7 +7,7 @@ import scala.io.StdIn
 
 object Solver {
 
-  type Square = Set[Int] // a square is a set of possible values
+  type Square = Set[Char] // a square is a set of possible values
   type Board = Vector[Square]
 
   /** Represents a sudoku problem with some pre-computed data like size and quadrant size */
@@ -77,7 +77,7 @@ object Solver {
     * @param board the board
     * @return
     */
-  def setSquare(index: Int, value: Int, board: Board): Option[Board] = {
+  def setSquare(index: Int, value: Char, board: Board): Option[Board] = {
 //    val quadrantSize = Math.sqrt(board.size).toInt
     mapBoard(_ - value, connectedSquares(index), board) // remove the value from the connected squares
       .map(b => b.updated(index, Set(value))) // then set the actual square
@@ -146,6 +146,11 @@ object Solver {
     map(board, 0)
   }
 
+  /***
+    * Print the board out nicely
+    * @param board
+    * @return
+    */
   def prettyPrint(board: Board): String = {
     board.grouped(BOARD_SIZE)
       .map(row =>
@@ -168,25 +173,40 @@ object Solver {
       }).mkString
   }
 
+  val chars = "123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  private val emptyBoard = Vector.fill(9 * 9)(chars.take(9).toSet)
+
+  // set the squares on the board to their specified values
+  def setupBoard(values: Seq[(Char, Int)], board: Board): Option[Board] = values match {
+    case Nil => Some(board)
+    case (n, i) :: rest => {
+      setSquare(i, n, board).flatMap(b => setupBoard(rest, b))
+    }
+  }
+
+  def loadSudoku(boardChars: Seq[Char]): Option[Board] = {
+    val toUpdate = boardChars.zipWithIndex.filter(_._1 != '0')
+    setupBoard(toUpdate, emptyBoard)
+  }
+
 }
 
 object Do extends App {
-  val boardStrings = Iterator.continually(StdIn.readLine())
+  val results = Iterator.continually(StdIn.readLine())
     .takeWhile(line => line != null && line.nonEmpty)
+    .map(line => {
+      val boardTokens = line.toList
+      val startTime = System.nanoTime
+      val solution = loadSudoku(boardTokens).flatMap(b => solve(b))
+      val endTime = System.nanoTime
+      val time = (endTime - startTime) / 1000
+      if (solution.nonEmpty) println(linePrint(solution.get)) else println("unsolvable")
+      (solution, time)
+    }).toList
 
-  val times = boardStrings.foldRight(List[Long]())((line, times) => {
-    val numbers = line.map(c => Integer.parseInt(c.toString)).toList
-    val startTime = System.currentTimeMillis()
-    val board = loadSudoku(numbers).flatMap(b => solve(b))
-    val endTime = System.currentTimeMillis()
-    val time = endTime - startTime
-    if(board.nonEmpty) println(linePrint(board.get))
-    time::times
-  })
+  val count = results.length
+  val total = results.map(x => x._2).sum.toDouble
 
-  val count = times.length
-  val total = times.sum.toDouble
-
-  println(s"Finished, $count sudokus solved\nAverage time: ${total/count}")
+  println(s"Finished, $count sudokuseys solved\nAverage time: ${total / count} microseconds")
 }
 
