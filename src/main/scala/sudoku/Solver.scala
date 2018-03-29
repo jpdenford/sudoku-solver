@@ -191,22 +191,4 @@ object Solver {
 
 }
 
-object Do extends App {
-  val results = Iterator.continually(StdIn.readLine())
-    .takeWhile(line => line != null && line.nonEmpty)
-    .map(line => {
-      val boardTokens = line.toList
-      val startTime = System.nanoTime
-      val solution = loadSudoku(boardTokens).flatMap(b => solve(b))
-      val endTime = System.nanoTime
-      val time = (endTime - startTime) / 1000
-      if (solution.nonEmpty) println(linePrint(solution.get)) else println("unsolvable")
-      (solution, time)
-    }).toList
-
-  val count = results.length
-  val total = results.map(x => x._2).sum.toDouble
-
-  println(s"Finished, $count sudokuseys solved\nAverage time: ${total / count} microseconds")
-}
 
