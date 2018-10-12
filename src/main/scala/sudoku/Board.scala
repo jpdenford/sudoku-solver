@@ -1,8 +1,8 @@
 package sudoku
 
-import sudoku.Board.Square
+//import sudoku.Board.Square
 
-import scala.collection.LinearSeqOptimized
+import scala.collection.{IterableView, LinearSeqOptimized}
 import scala.collection.immutable.{LinearSeq, StreamViewLike}
 
 /** Coordinate which is useful for some operations */
@@ -21,6 +21,16 @@ case class Area(topLeft: Coord, bottomRight: Coord) {
 //  def solve()
 //}
 
+case class Square(values: Set[Char]) {
+  def view: IterableView[Char, Set[Char]] = values.view
+  def -(c: Char) = Square(values - c)
+  def isSolved: Boolean = values.size == 1
+  def exhausted: Boolean = values.isEmpty
+  def pickFirst: Char = values.head
+}
+object Square {
+  def apply(char: Char): Square = Square(Set(char))
+}
 
 trait Board {
   def solve: Option[Board]
@@ -30,7 +40,7 @@ trait Board {
   def toStringPretty: String
 }
 
-final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
+final case class BoardImpl(private val values: IndexedSeq[Square]) extends Board {
 
   val BOARD_SIZE = 9
 
@@ -45,7 +55,7 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
       case None => Some(this)
       case Some(index) => {
         // use a view as we only take the first solution to the board
-        val possibleValues = this.values(index).view
+        val possibleValues = this(index).view
         val solutions = for {
           number <- possibleValues
           newBoard <- this.setSquare(index, number) // try this value on the current square
@@ -55,20 +65,13 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
       }
     }
   }
-  /***
-    * See if the given square is solved aka. has a single value
-    *
-    * @param sq
-    * @return
-    */
-  def hasKnownValue(sq: Square): Boolean = sq.size == 1
 
   /***
     * Get the first index which isn't set or None if board is full
     */
   def firstUnknownIndex: Option[Int] =
     values.zipWithIndex
-    .find(x => !hasKnownValue(x._1))
+    .find(x => !isSolved(x._1))
     .flatMap(x => Some(x._2))
 
   /**
@@ -77,13 +80,12 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
     *
     * @param index the index on the board
     * @param value the value to set the given index to
-    * @param board the board
     * @return
     */
   def setSquare(index: Int, value: Char): Option[BoardImpl] = {
     //    val quadrantSize = Math.sqrt(board.size).toInt
-    mapBoard(_ - value, connectedSquares(index)) // remove the value from the connected squares
-      .map(b => b.updated(index, Set(value))) // then set the actual square
+    mapBoard(_ - value, connSquaresPred(index)) // remove the value from the connected squares
+      .map(b => b.updated(index, Square(value))) // then set the actual square
   }
 
   /***
@@ -100,14 +102,14 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
 
   /** *
     * Returns a predicate which tests if a given index i is in
-    * the same row, column or quadrant as n (excluding n)
+    * the same row, column or quadrant as index (excluding index)
     *
-    * @param n square we're interested in
+    * @param index square we're interested in
     * @return predicate function
     */
-  def connectedSquares(n: Int): Int => Boolean = {
+  def connSquaresPred(index: Int): Int => Boolean = {
     val quadrantSize = 3 // TODO replace with argument
-    val nCoord =  Coord.fromIndex(n, BOARD_SIZE)
+    val nCoord =  Coord.fromIndex(index, BOARD_SIZE)
     val nQuad = getQuadrant(nCoord, quadrantSize)
 
     val inColumn: Int => Boolean = i => Coord.fromIndex(i, BOARD_SIZE).x == nCoord.x
@@ -115,12 +117,26 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
     val inRow: Int => Boolean = i => Coord.fromIndex(i, BOARD_SIZE).y == nCoord.y
 
     val inQuad: Int => Boolean = i => nQuad contains Coord.fromIndex(i, BOARD_SIZE)
-    // note we don't want to include the actual index
-    (i: Int) => (i != n) && (inColumn(i) || inRow(i) || inQuad(i))
+    (i: Int) => (i != index) && (inColumn(i) || inRow(i) || inQuad(i))
   }
 
-  private def updated(index: Int, value: Square): BoardImpl = BoardImpl(this.values.updated(index, value))
+  private def indexIsSolved(index: Int) = isSolved(values(index))
 
+  /***
+    * See if the given square is solved aka. has a single value
+    *
+    * @param sq
+    * @return
+    */
+  private def isSolved(sq: Square): Boolean = sq.isSolved
+
+  private def squareExhausted(sq: Square): Boolean = sq.exhausted
+
+//  private def indexOutOfOptions(index: Int): Boolean = squareExhausted(values(index))
+
+  private def updated(index: Int, newValue: Square): BoardImpl = BoardImpl(this.values.updated(index, newValue))
+
+  def apply(index: Int): Square = this.values(index)
   /** *
     * Map an operation over a board for the valid squares
     * Option result will contain board if operation is valid for all mapped squares
@@ -130,21 +146,25 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
     * @return
     */
   def mapBoard(op: Square => Square, pred: Int => Boolean): Option[BoardImpl] = {
-    map(this, 0, op, pred)
+    this.map(0, op, pred)
   }
 
-  private def map(board: BoardImpl, index: Int, op: Square => Square, pred: Int => Boolean): Option[BoardImpl] = {
-    if (index >= board.values.size) Some(board)
-    else if (!pred(index)) map(board, index + 1, op, pred) // skip
+  private def map(index: Int, op: Square => Square, pred: Int => Boolean): Option[BoardImpl] = {
+    if (index >= this.values.size) return Some(this)
+    val curSquare = this(index)
+    if (squareExhausted(curSquare)) None
+    else if (!pred(index)) this.map(index + 1, op, pred) // skip
     else {
-      val newBoard = board.updated(index, op(board.values(index)))
-      if (newBoard.values(index).isEmpty) None // operation was invalid as square is now empty
-      else if (newBoard.values(index).size == 1 && board.values(index).size > 1) { // the square is now solved
-        val boardUpdated = newBoard.setSquare(index, newBoard.values(index).head)
-        if (boardUpdated.isEmpty) None // couldn't continue with update
-        else map(boardUpdated.get, index + 1, op, pred) // successful, continue
-      }
-      else map(newBoard, index + 1, op, pred)
+      val newBoard = this.updated(index, op(curSquare))
+      val newSquare = newBoard(index)
+      if (squareExhausted(newSquare)) None // operation was invalid as square is now empty
+      else if (isSolved(newSquare) && !indexIsSolved(index)) { // the square is now solved
+        val boardUpdated = newBoard.setSquare(index, newSquare.pickFirst)
+        boardUpdated match {
+          case Some(newB) => newB.map(index + 1, op, pred) // successful, continue
+          case None => None // couldn't continue with update
+        }
+      } else newBoard.map(index + 1, op, pred)
     }
   }
 
@@ -157,7 +177,7 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
       .map(row =>
         row.map(
           square => {
-            val value = if (square.size == 1) square.head.toString else " "
+            val value = if (square.isSolved) square.pickFirst.toString else " "
             s"| $value "
           }).mkString
       ).mkString("\n")
@@ -169,7 +189,7 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
     */
   def linePrint(): String = {
     this.values.map( square => {
-      if (square.size == 1) square.head.toString else "0"
+      if (square.isSolved) square.pickFirst.toString else "0"
     }).mkString
   }
 
@@ -178,16 +198,12 @@ final case class BoardImpl(values: IndexedSeq[Square]) extends Board {
     case Nil => Some(this)
     case (n, i) :: rest => this.setSquare(i, n).flatMap(_.setupBoard(rest))
   }
-
-
-
-//  override def length: Int = values.length
 }
 
 object Board {
   type Square = Set[Char] // a square is a set of possible values
   val chars = "123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  private val emptyBoard = Vector.fill(9 * 9)(chars.take(9).toSet)
+  private val emptyBoard = Vector.fill(9 * 9)(Square(chars.take(9).toSet))
   def loadSudoku(boardChars: Seq[Char]): Option[BoardImpl] = {
     val toUpdate = boardChars.zipWithIndex.filter(_._1 != '0')
     BoardImpl(emptyBoard).setupBoard(toUpdate)
