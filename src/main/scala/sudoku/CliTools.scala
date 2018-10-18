@@ -32,10 +32,10 @@ object Main extends App {
         .map(line => {
           val boardTokens = line.toList
           val startTime = System.nanoTime
-          val solution = Board.loadSudoku(boardTokens).flatMap(_.solve)
+          val solution = BoardImpl.loadSudoku(boardTokens).flatMap(_.solve)
           val endTime = System.nanoTime
           val time = (endTime - startTime) / 1000
-          if (solution.nonEmpty) println(solution.get.linePrint()) else println()
+          if (solution.nonEmpty) println(solution.get.toStringPretty) else println()
           (solution, time)
         }).toList
 
